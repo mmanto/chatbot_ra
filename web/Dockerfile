@@ -12,9 +12,14 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ---- builder: compila la app ----
+# API_URL se lee en `next build` (Next hornea el destino de las rewrites en
+# .next/routes-manifest.json); si falta, next.config cae al fallback
+# localhost:8001 y el proxy /api/* apunta al propio contenedor (ECONNREFUSED).
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV API_URL=$API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
