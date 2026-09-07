@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useParams } from "next/navigation";
 import { MessageCircle, SendHorizonal } from "lucide-react";
 
@@ -248,6 +254,57 @@ export default function ChatPublicoPage() {
   );
 }
 
+const RE_URL = /https?:\/\/[^\s<>"']+|www\.[^\s<>"']+/gi;
+
+const PUNTUACION_FINAL = ".,;:!?¡¿";
+const CIERRES: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+
+function limpiarUrl(raw: string): string {
+  let fin = raw.length;
+  while (fin > 0) {
+    const c = raw[fin - 1];
+    const esCierre = CIERRES[c] !== undefined && !raw.slice(0, fin - 1).includes(CIERRES[c]);
+    if (!PUNTUACION_FINAL.includes(c) && !esCierre) break;
+    fin--;
+  }
+  return raw.slice(0, fin);
+}
+
+function renderizarContenido(contenido: string, esVisitor: boolean) {
+  const nodos: ReactNode[] = [];
+  let cursor = 0;
+  RE_URL.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = RE_URL.exec(contenido)) !== null) {
+    const idx = match.index;
+    if (idx > cursor) nodos.push(contenido.slice(cursor, idx));
+    const url = limpiarUrl(match[0]);
+    if (url.length > 0) {
+      const href = url.startsWith("www.") ? `https://${url}` : url;
+      nodos.push(
+        <a
+          key={idx}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            esVisitor
+              ? "underline underline-offset-2"
+              : "text-primary underline underline-offset-2"
+          }
+        >
+          {url}
+        </a>
+      );
+    } else {
+      nodos.push(match[0]);
+    }
+    cursor = idx + match[0].length;
+  }
+  if (cursor < contenido.length) nodos.push(contenido.slice(cursor));
+  return nodos;
+}
+
 function Burbuja({ mensaje }: { mensaje: MensajeChat }) {
   const esVisitor = mensaje.autor === "visitor";
   return (
@@ -259,7 +316,9 @@ function Burbuja({ mensaje }: { mensaje: MensajeChat }) {
             : "max-w-[80%] rounded-2xl rounded-bl-md border bg-white px-3 py-2 shadow-sm"
         }
       >
-        <p className="whitespace-pre-wrap break-words text-sm">{mensaje.contenido}</p>
+        <p className="whitespace-pre-wrap break-words text-sm">
+          {renderizarContenido(mensaje.contenido, esVisitor)}
+        </p>
         <p
           className={
             esVisitor
